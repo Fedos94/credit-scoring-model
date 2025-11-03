@@ -66,3 +66,5 @@ The code automatically downloads the dataset using `kagglehub` - no authenticati
 ```bash
 pip install kagglehub
 python src/data/make_dataset.py
+# credit-scoring-model
+Machine Learning API for credit scoring prediction
