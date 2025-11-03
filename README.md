@@ -97,8 +97,6 @@ Project Organization
     
 --------
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
-
 ## Kaggle Dataset Setup
 
 This project uses the "Default of Credit Card Clients Dataset" from Kaggle. 
