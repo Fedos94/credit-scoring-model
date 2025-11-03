@@ -102,8 +102,6 @@ Project Organization
 ## Kaggle Dataset Setup
 
 This project uses the "Default of Credit Card Clients Dataset" from Kaggle. 
-
-### Option 1: Using kagglehub (Recommended)
 The code automatically downloads the dataset using `kagglehub` - no authentication needed for public datasets:
 
 ```bash
