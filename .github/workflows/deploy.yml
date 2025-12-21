@@ -1,0 +1,27 @@
+﻿name: Test CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Print hello
+      run: |
+        echo "🎉 GitHub Actions работает!"
+        echo "Репо: ${{ github.repository }}"
+        echo "Ветка: ${{ github.ref }}"
+        echo "Коммит: ${{ github.sha }}"
+    
+    - name: List files
+      run: |
+        echo "📁 Содержимое репозитория:"
+        ls -la
