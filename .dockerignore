@@ -1,0 +1,66 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Data (we'll download fresh)
+data/raw/
+data/processed/
+
+# Models (we'll train fresh)
+models/
+
+# Reports
+reports/
+
+# MLflow
+mlruns/
+artifacts/
+
+# Testing
+tests/
+.pytest_cache/
+
+# Notebooks
+notebooks/
+.ipynb_checkpoints/
+
+# Documentation
+docs/
+references/
+
+# Kaggle credentials (include only for development)
+kaggle.json
