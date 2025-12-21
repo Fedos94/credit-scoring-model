@@ -13,19 +13,19 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-
+    
     steps:
     - uses: actions/checkout@v3
-
+    
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-
+    
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-
+    
     - name: Run tests
       run: |
         python -m pytest tests/ -v
@@ -34,60 +34,60 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
+    
     steps:
     - uses: actions/checkout@v3
-
+    
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
-
+    
     - name: Login to Yandex Container Registry
       run: |
-        echo '${{ secrets.YC_SA_KEY }}' | base64 --decode | docker login \
+        echo "${{ secrets.YC_SA_KEY }}" | base64 --decode | docker login \
           --username json_key \
           --password-stdin \
           cr.yandex
-
+    
     - name: Build and push
       run: |
         # Сборка с тегом по SHA коммита
         docker build -t ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-
+        
         # Пуш образа
         docker push ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
+        
         # Также тег latest
         docker tag ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
                    ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-
+        
         docker push ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
 
   deploy-to-kubernetes:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
+    
     steps:
     - uses: actions/checkout@v3
-
+    
     - name: Set up kubectl
       uses: azure/setup-kubectl@v3
-
+    
     - name: Configure kubeconfig
       run: |
         mkdir -p $HOME/.kube
-        echo '${{ secrets.KUBECONFIG }}' | base64 --decode > $HOME/.kube/config
-
+        echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+    
     - name: Deploy to cluster
       run: |
         # Обновляем образ в deployment
         kubectl set image deployment/credit-scoring-api \
           api=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n credit-scoring
-
+        
         # Ждем обновления
         kubectl rollout status deployment/credit-scoring-api -n credit-scoring --timeout=180s
-
+        
         # Проверяем
         kubectl get pods -n credit-scoring
         kubectl get svc -n credit-scoring
