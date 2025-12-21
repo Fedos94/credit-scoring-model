@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit-scoring-api
+  namespace: credit-scoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: credit-scoring-api
+  template:
+    metadata:
+      labels:
+        app: credit-scoring-api
+    spec:
+      imagePullSecrets:
+      - name: ycr-pull-secret
+      containers:
+      - name: api
+        image: cr.yandex/crpn72dh0c06a6o5php2/credit-scoring-api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MODEL_PATH
+          value: "/app/credit_model.onnx"
+        - name: LOG_LEVEL
+          value: "INFO"

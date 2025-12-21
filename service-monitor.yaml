@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: credit-scoring-api
+  namespace: credit-scoring
+  labels:
+    release: prometheus  # должен совпадать с prometheus selector
+spec:
+  selector:
+    matchLabels:
+      app: credit-scoring-api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

@@ -1,0 +1,73 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: credit-scoring-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: prometheus
+spec:
+  groups:
+  - name: credit-scoring-alerts
+    rules:
+    - alert: CreditScoringHighErrorRate
+      expr: |
+        sum(rate(credit_scoring_predictions_total{status="error"}[5m]))
+        / 
+        sum(rate(credit_scoring_predictions_total[5m]))
+        * 100 > 5
+      for: 2m
+      labels:
+        severity: warning
+        app: credit-scoring-api
+      annotations:
+        summary: "High error rate in credit scoring API"
+        description: "Error rate is {{ $value }}% (threshold: 5%)"
+        runbook_url: "https://github.com/your-org/credit-scoring/wiki/Alerts"
+    
+    - alert: CreditScoringHighPredictionLatency
+      expr: |
+        histogram_quantile(0.95, rate(credit_scoring_prediction_duration_seconds_bucket[5m])) > 1
+      for: 3m
+      labels:
+        severity: warning
+        app: credit-scoring-api
+      annotations:
+        summary: "High prediction latency in credit scoring"
+        description: "95th percentile latency is {{ $value }}s (threshold: 1s)"
+    
+    - alert: CreditScoringModelNotLoaded
+      expr: |
+        credit_scoring_model_loaded == 0
+      for: 1m
+      labels:
+        severity: critical
+        app: credit-scoring-api
+      annotations:
+        summary: "ONNX model not loaded in credit scoring API"
+        description: "Credit scoring model failed to load or crashed"
+    
+    - alert: CreditScoringNoPredictions
+      expr: |
+        rate(credit_scoring_predictions_total[10m]) == 0
+      for: 5m
+      labels:
+        severity: warning
+        app: credit-scoring-api
+      annotations:
+        summary: "No predictions received by credit scoring API"
+        description: "No prediction requests in last 10 minutes"
+    
+    - alert: CreditScoringLowSuccessRate
+      expr: |
+        sum(rate(credit_scoring_predictions_total{status="success"}[5m]))
+        / 
+        sum(rate(credit_scoring_predictions_total[5m]))
+        * 100 < 95
+      for: 3m
+      labels:
+        severity: warning
+        app: credit-scoring-api
+      annotations:
+        summary: "Low success rate in credit scoring"
+        description: "Success rate is {{ $value }}% (threshold: 95%)"

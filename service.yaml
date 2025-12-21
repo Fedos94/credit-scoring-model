@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: credit-scoring-service
+  namespace: credit-scoring
+  labels:
+    app: credit-scoring-api
+spec:
+  selector:
+    app: credit-scoring-api
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP
