@@ -23,12 +23,11 @@ jobs:
       - name: "Set up Docker Buildx"
         uses: docker/setup-buildx-action@v3
 
-      - name: "Log in to Yandex Container Registry"
-        run: |
-          echo '${{ secrets.YC_SA_KEY }}' | docker login \
-            --username json_key \
-            --password-stdin \
-            cr.yandex
+      - name: "Log in to Yandex Container Registry (Official Action)"
+        uses: yc-actions/yc-cr-login@v3
+        with:
+          # Передайте секрет напрямую. Убедитесь, что это корректный JSON файл.
+          yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
 
       - name: "Build Docker Image"
         id: build
