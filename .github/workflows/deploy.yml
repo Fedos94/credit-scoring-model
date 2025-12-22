@@ -69,8 +69,8 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: "Upload Vulnerability Report"
-        uses: github/codeql-action/upload-sarif@v2
-        if: always() # Загружаем отчёт, даже если сканирование нашло уязвимости
+        uses: github/codeql-action/upload-sarif@v3  # ← ИЗМЕНИЛОСЬ
+        if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
