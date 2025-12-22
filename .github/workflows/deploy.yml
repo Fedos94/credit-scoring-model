@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: cr.yandex
   IMAGE_NAME: credit-scoring-api
-  REGISTRY_ID: crpn72dh0c06a6o5php2
+  
   DEPLOY_NAMESPACE: 'credit-scoring' # Будем менять для staging/prod
 
 # 2. Добавляем ручной триггер для деплоя в Production
@@ -42,8 +42,8 @@ jobs:
           echo "DEBUG: REGISTRY_ID=${{ secrets.REGISTRY_ID }}"
           echo "DEBUG: IMAGE_NAME=${{ env.IMAGE_NAME }}"
           echo "DEBUG: SHORT_SHA=$SHORT_SHA"
-          
-          IMAGE_TAG=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
+          IMAGE_TAG=${{ env.REGISTRY }}/crp2b8g79h7i********/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
+          IMAGE_TAG=${{ env.REGISTRY }}/crpn72dh0c06a6o5php2/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
           echo "DEBUG: IMAGE_TAG=$IMAGE_TAG"
           
           docker build -t $IMAGE_TAG .
