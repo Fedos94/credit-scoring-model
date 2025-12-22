@@ -1,4 +1,4 @@
-﻿name: Full CI/CD Pipeline
+﻿name: CI/CD Pipeline (Build → Test → Deploy)
 
 on:
   push:
@@ -6,81 +6,141 @@ on:
   pull_request:
     branches: [ main ]
 
+# 1. Определяем переменные и окружения
 env:
   REGISTRY: cr.yandex
   IMAGE_NAME: credit-scoring-api
+  DEPLOY_NAMESPACE: 'credit-scoring' # Будем менять для staging/prod
 
+# 2. Добавляем ручной триггер для деплоя в Production
 jobs:
-  test:
+  # --- СТАДИЯ: BUILD & TEST ---
+  build-and-test:
+    name: "Build & Test"
     runs-on: ubuntu-latest
+    outputs: # Делаем образ доступным для следующих джобов
+      image-tag: ${{ steps.build.outputs.image-tag }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v3
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          if [ -f src/requirements.txt ]; then
-            pip install -r src/requirements.txt
-          fi
-
-      - name: Run tests
-        run: |
-          if [ -f "tests/test_basic.py" ]; then
-            python -m pytest tests/test_basic.py -v --tb=short
-          else
-            echo "⚠️  Test file 'tests/test_basic.py' not found. Skipping tests."
-          fi
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'  # ✅ Исправлено: одинарные кавычки
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Yandex Container Registry
+      - name: "Log in to Yandex Container Registry"
         run: |
           echo '${{ secrets.YC_SA_KEY }}' | base64 --decode | docker login \
-            --username json_key \
-            --password-stdin \
-            cr.yandex
+            --username json_key --password-stdin cr.yandex
 
-      - name: Build and push
+      - name: "Build Docker Image"
+        id: build
         run: |
-          docker build -t ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          docker push ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:latest
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+          IMAGE_TAG=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-  deploy-to-kubernetes:
-    needs: build-and-push
+      - name: "Run Application Tests"
+        run: |
+          pip install -r requirements.txt
+          python -m pytest tests/ -v --tb=short
+
+  # --- СТАДИЯ: SECURITY SCAN ---
+  security-scan:
+    name: "Security Scan"
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'  # ✅ Исправлено: одинарные кавычки
+    needs: [build-and-test]
+    steps:
+      - name: "Scan Docker Image for Vulnerabilities (Trivy)"
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ needs.build-and-test.outputs.image-tag }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: "Upload Vulnerability Report"
+        uses: github/codeql-action/upload-sarif@v2
+        if: always() # Загружаем отчёт, даже если сканирование нашло уязвимости
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: "Check for Secrets in Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          pip install detect-secrets
+          detect-secrets scan --baseline .secrets.baseline
+
+  # --- СТАДИЯ: DEPLOY TO STAGING ---
+  deploy-staging:
+    name: "Deploy to Staging"
+    runs-on: ubuntu-latest
+    needs: [build-and-test, security-scan] # Зависит от успешной сборки и security scan
+    environment: 
+      name: staging
+      url: https://staging.credit-scoring.your-domain.com # Пример URL
+    permissions:
+      contents: read
+      deployments: write
 
     steps:
-      - uses: actions/checkout@v3
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure kubeconfig
+      - name: "Configure kubeconfig for Yandex Cloud"
         run: |
-          mkdir -p $HOME/.kube
-          echo '${{ secrets.KUBECONFIG }}' | base64 --decode > $HOME/.kube/config
+          echo '${{ secrets.YC_KUBECONFIG }}' | base64 --decode > $HOME/.kube/config
+          kubectl config current-context
 
-      - name: Deploy to cluster
+      - name: "Deploy to Kubernetes (Staging)"
         run: |
-          kubectl set image deployment/credit-scoring-api api=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n credit-scoring
+          # Создаем namespace если не существует
+          kubectl create namespace credit-scoring-staging --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Применяем конфигурацию
+          kubectl apply -f k8s/staging.yaml -n credit-scoring-staging
+          
+          # Обновляем образ
+          kubectl set image deployment/credit-scoring-api \
+            api=${{ needs.build-and-test.outputs.image-tag }} \
+            -n credit-scoring-staging
+
+      - name: "Check if service is running"
+        run: |
+          sleep 10  # ждем 10 секунд
+          kubectl rollout status deployment/credit-scoring-api -n credit-scoring-staging --timeout=180s
+          echo "✅ Service deployed successfully!"
+
+  # --- СТАДИЯ: DEPLOY TO PRODUCTION (Manual Approval) ---
+  deploy-production:
+    name: "Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: [deploy-staging] # Можно добавить и security-scan
+    environment: 
+      name: production
+      url: https://credit-scoring.your-domain.com
+    permissions:
+      contents: read
+      deployments: write
+    # Ключевой момент: деплой в prod требует ручного подтверждения
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Configure kubeconfig for Yandex Cloud"
+        run: |
+          echo '${{ secrets.YC_KUBECONFIG }}' | base64 --decode > $HOME/.kube/config
+          kubectl config current-context
+
+      - name: "Deploy to Kubernetes (Production)"
+        run: |
+          kubectl set image deployment/credit-scoring-api \
+            api=${{ needs.build-and-test.outputs.image-tag }} \
+            -n credit-scoring
           kubectl rollout status deployment/credit-scoring-api -n credit-scoring --timeout=180s
-          kubectl get pods -n credit-scoring
-          kubectl get svc -n credit-scoring
