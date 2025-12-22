@@ -10,6 +10,7 @@ on:
 env:
   REGISTRY: cr.yandex
   IMAGE_NAME: credit-scoring-api
+  REGISTRY_ID: crpn72dh0c06a6o5php2
   DEPLOY_NAMESPACE: 'credit-scoring' # Будем менять для staging/prod
 
 # 2. Добавляем ручной триггер для деплоя в Production
