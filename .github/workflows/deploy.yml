@@ -166,50 +166,28 @@ jobs:
       - name: "Checkout Code"
         uses: actions/checkout@v4
       
-      - name: "Configure kubeconfig for Yandex Cloud"
+      - name: "Configure Yandex Cloud CLI"
+        uses: yc-actions/yc-cr-login@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_KEY }}
+
+      - name: "Install Yandex Cloud CLI"
         run: |
-          # Создаем директорию .kube
-          mkdir -p $HOME/.kube
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          source ~/.bashrc
+          yc version
+
+      - name: "Get kubeconfig for cluster"
+        run: |
+          # Установите имя вашего кластера
+          CLUSTER_NAME="your-cluster-name"
           
-          # Сохраняем kubeconfig
-          echo "Decoding kubeconfig from secret..."
-          KUBECONFIG_CONTENT=$(echo '${{ secrets.YC_KUBECONFIG }}' | base64 --decode)
-          echo "$KUBECONFIG_CONTENT" > $HOME/.kube/config
+          # Получаем kubeconfig
+          yc managed-kubernetes cluster get-credentials $CLUSTER_NAME --external --force
           
-          # Проверяем содержимое kubeconfig (безопасно, без секретов)
-          echo "=== Kubeconfig structure ==="
-          kubectl config view --minify --raw | grep -E "^(apiVersion|clusters|contexts|current-context):" || true
-          
-          # Пытаемся автоматически установить контекст
-          CURRENT_CONTEXT=$(kubectl config view -o jsonpath='{.current-context}' 2>/dev/null || true)
-          
-          if [ -z "$CURRENT_CONTEXT" ]; then
-            echo "WARNING: No current context set. Trying to set one..."
-            
-            # Получаем список контекстов
-            CONTEXTS=$(kubectl config get-contexts -o name 2>/dev/null || true)
-            
-            if [ -n "$CONTEXTS" ]; then
-              # Берем первый контекст из списка
-              FIRST_CONTEXT=$(echo "$CONTEXTS" | head -1)
-              echo "Setting context to: $FIRST_CONTEXT"
-              kubectl config use-context "$FIRST_CONTEXT"
-            else
-              echo "ERROR: No contexts found in kubeconfig!"
-              echo "Kubeconfig content (first 10 lines):"
-              head -10 $HOME/.kube/config
-              exit 1
-            fi
-          else
-            echo "Current context: $CURRENT_CONTEXT"
-          fi
-          
-          # Проверяем доступ к кластеру
-          echo "Testing cluster connection..."
-          kubectl cluster-info || echo "WARNING: Could not connect to cluster"
-          
-          # Проверяем ноды
-          kubectl get nodes --request-timeout=10s || echo "WARNING: Could not get nodes"
+          # Проверяем
+          kubectl config current-context
+          kubectl get nodes
       
       - name: "Verify Kubernetes access"
         run: |
