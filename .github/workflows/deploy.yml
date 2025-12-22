@@ -56,31 +56,36 @@ jobs:
 
   # --- СТАДИЯ: SECURITY SCAN ---
   security-scan:
-    name: "Security Scan"
-    runs-on: ubuntu-latest
-    needs: [build-and-test]
-    steps:
-      - name: "Scan Docker Image for Vulnerabilities (Trivy)"
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ needs.build-and-test.outputs.image-tag }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+  name: "Security Scan"
+  runs-on: ubuntu-latest
+  needs: [build-and-test]
+  # 🔑 ADD THIS PERMISSIONS BLOCK
+  permissions:
+    security-events: write  # Required for uploading SARIF reports[citation:8]
+    contents: read
+  steps:
+    - name: "Scan Docker Image for Vulnerabilities (Trivy)"
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ needs.build-and-test.outputs.image-tag }}' # Double-check this variable
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
 
-      - name: "Upload Vulnerability Report"
-        uses: github/codeql-action/upload-sarif@v3  # ← ИЗМЕНИЛОСЬ
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
+    - name: "Upload Vulnerability Report"
+      # ✅ CHANGE FROM v3 TO v4
+      uses: github/codeql-action/upload-sarif@v4
+      if: always() # Upload report even if scan found vulnerabilities
+      with:
+        sarif_file: 'trivy-results.sarif'
 
-      - name: "Check for Secrets in Code"
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - run: |
-          pip install detect-secrets
-          detect-secrets scan --baseline .secrets.baseline
+    - name: "Check for Secrets in Code"
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - run: |
+        pip install detect-secrets
+        detect-secrets scan --baseline .secrets.baseline
 
   # --- СТАДИЯ: DEPLOY TO STAGING ---
   deploy-staging:
