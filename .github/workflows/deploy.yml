@@ -35,12 +35,19 @@ jobs:
 
       - name: "Build Docker Image"
         id: build
-        run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
-          IMAGE_TAG=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
-          docker build -t $IMAGE_TAG .
-          docker push $IMAGE_TAG
-          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+  	run: |
+    	  SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+    	  echo "DEBUG: REGISTRY=${{ env.REGISTRY }}"
+    	  echo "DEBUG: REGISTRY_ID=${{ secrets.REGISTRY_ID }}"
+    	  echo "DEBUG: IMAGE_NAME=${{ env.IMAGE_NAME }}"
+    	  echo "DEBUG: SHORT_SHA=$SHORT_SHA"
+    
+    	  IMAGE_TAG=${{ env.REGISTRY }}/${{ secrets.REGISTRY_ID }}/${{ env.IMAGE_NAME }}:sha-$SHORT_SHA
+    	  echo "DEBUG: IMAGE_TAG=$IMAGE_TAG"
+    
+    	  docker build -t $IMAGE_TAG .
+   	  docker push $IMAGE_TAG
+    	  echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: "Run Application Tests"
         run: |
