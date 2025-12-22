@@ -7,10 +7,13 @@ numpy>=1.24.0
 pandas>=2.0.0
 scikit-learn>=1.3.0
 
-# API зависимости (из src/requirements.txt если есть)
+# API зависимости
 fastapi>=0.100.0
 uvicorn>=0.23.0
 
 # Утилиты
 python-dotenv>=1.0.0
 joblib>=1.3.0
+
+# Мониторинг
+prometheus-fastapi-instrumentator>=5.9.0
