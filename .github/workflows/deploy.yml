@@ -168,10 +168,48 @@ jobs:
       
       - name: "Configure kubeconfig for Yandex Cloud"
         run: |
+          # Создаем директорию .kube
           mkdir -p $HOME/.kube
-          echo '${{ secrets.YC_KUBECONFIG }}' | base64 --decode > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-          kubectl config current-context
+          
+          # Сохраняем kubeconfig
+          echo "Decoding kubeconfig from secret..."
+          KUBECONFIG_CONTENT=$(echo '${{ secrets.YC_KUBECONFIG }}' | base64 --decode)
+          echo "$KUBECONFIG_CONTENT" > $HOME/.kube/config
+          
+          # Проверяем содержимое kubeconfig (безопасно, без секретов)
+          echo "=== Kubeconfig structure ==="
+          kubectl config view --minify --raw | grep -E "^(apiVersion|clusters|contexts|current-context):" || true
+          
+          # Пытаемся автоматически установить контекст
+          CURRENT_CONTEXT=$(kubectl config view -o jsonpath='{.current-context}' 2>/dev/null || true)
+          
+          if [ -z "$CURRENT_CONTEXT" ]; then
+            echo "WARNING: No current context set. Trying to set one..."
+            
+            # Получаем список контекстов
+            CONTEXTS=$(kubectl config get-contexts -o name 2>/dev/null || true)
+            
+            if [ -n "$CONTEXTS" ]; then
+              # Берем первый контекст из списка
+              FIRST_CONTEXT=$(echo "$CONTEXTS" | head -1)
+              echo "Setting context to: $FIRST_CONTEXT"
+              kubectl config use-context "$FIRST_CONTEXT"
+            else
+              echo "ERROR: No contexts found in kubeconfig!"
+              echo "Kubeconfig content (first 10 lines):"
+              head -10 $HOME/.kube/config
+              exit 1
+            fi
+          else
+            echo "Current context: $CURRENT_CONTEXT"
+          fi
+          
+          # Проверяем доступ к кластеру
+          echo "Testing cluster connection..."
+          kubectl cluster-info || echo "WARNING: Could not connect to cluster"
+          
+          # Проверяем ноды
+          kubectl get nodes --request-timeout=10s || echo "WARNING: Could not get nodes"
       
       - name: "Verify Kubernetes access"
         run: |
